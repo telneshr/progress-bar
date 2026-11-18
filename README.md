@@ -16,18 +16,16 @@ The colors are a yellow tile on near-black with white text.
 At the prompt of a terminal session:
 
 ```
-/plugin install progress-bar --marketplace OWNER/REPO
+/plugin install progress-bar --marketplace telneshr/progress-bar
 ```
 
 From a shell:
 
 ```
-claude plugin install progress-bar --marketplace OWNER/REPO
+claude plugin install progress-bar --marketplace telneshr/progress-bar
 ```
 
-In the desktop app, where `/plugin` does not run: click + next to the prompt box, then Plugins, Add marketplace with `OWNER/REPO`, then Add plugin.
-
-Replace `OWNER/REPO` with this repository's GitHub name.
+In the desktop app, where `/plugin` does not run: click + next to the prompt box, then Plugins, Add marketplace with `telneshr/progress-bar`, then Add plugin.
 
 ## Notes
 
