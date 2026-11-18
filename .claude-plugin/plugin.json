@@ -1,0 +1,6 @@
+{
+  "name": "progress-bar",
+  "version": "0.1.0",
+  "description": "A progress bar above the prompt showing which step of the task Claude is on.",
+  "types": "./types/index.d.ts"
+}

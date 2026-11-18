@@ -1,0 +1,5 @@
+{
+  "name": "claude-progress-bar",
+  "owner": { "name": "claude-progress-bar" },
+  "plugins": [{ "name": "progress-bar", "source": "./" }]
+}
