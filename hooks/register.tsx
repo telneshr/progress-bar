@@ -2,9 +2,12 @@ import { atom, read, update } from 'claude-code'
 import type { AgentInfo, ElementTable, Register } from 'claude-code'
 
 import type { Activity, AgentExtra, AgentSnap, Step } from '../types'
-import { CARD_H, cardSvg, fmtTime, fmtTokens, statsSvg, STATS_H } from './card'
+import { CARD_H, cardSvg, fmtTime, fmtTokens, markOf, modelLine, statsSvg, STATS_H } from './card'
 import type { Row } from './card'
 import { iconKind, KIND_COLOR } from './icons'
+import { C } from './look'
+import { CLAUDE_ORANGE, H, MAX_WIDTH, MIN_WIDTH, pillSvg, PX_PER_COLUMN, tokenPillSvg, tokenPillWidth } from './pill'
+import type { Pill } from './pill'
 
 const PANE = 'agents'
 
@@ -176,143 +179,7 @@ const bar = (done: number, total: number): string => {
   return '█'.repeat(filled) + '░'.repeat(BAR_WIDTH - filled)
 }
 
-// ---------------------------------------------------------------- the pill
-
-// The telnes colors: yellow tile, near-black, white.
-const YELLOW = '#ffd23f'
-const INK = '#111111'
-const DARK = '#121212'
-const ORANGE = '#d97757'
-
-/** Pixels the desktop gives one character column: the pill is sized from it. */
-const PX_PER_COLUMN = 8.3
-const MIN_WIDTH = 520
-const MAX_WIDTH = 1400
-const H = 44
-/** The corner radius, the same as the message box under the bar. */
-const RADIUS = 16
-const TRACK_H = 22
-/** Space between halftone dots, and how many sizes they grow through. */
-const DOT_STEP = 6
-const DOT_SIZES = 8
-
-// The Claude Code icon, the path of claudecode-color.svg (a 24 by 24 box, the
-// drawing itself spanning rows 5 to 20). The eyes are holes in the path.
-const ICON_PATH =
-  'M20.998 10.949H24v3.102h-3v3.028h-1.487V20H18v-2.921h-1.487V20H15v-2.921H9V20H7.488v-2.921H6V20H4.487v-2.921H3V14.05H0V10.95h3V5h17.998v5.949zM6 10.949h1.488V8.102H6v2.847zm10.51 0H18V8.102h-1.49v2.847z'
-const ICON_TOP = 5
-const ICON_ROWS = 15
-const ICON_SCALE = 1.5
-const ICON_W = 24 * ICON_SCALE
-
-const esc = (s: string): string =>
-  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-
 const clip = (s: string, max: number): string => (s.length > max ? `${s.slice(0, max - 1)}…` : s)
-
-/** The yellow pill with the tokens spent: fully rounded ends, ink text. */
-const tokenPillWidth = (text: string): number => Math.round(text.length * 8.6 + 28)
-
-const tokenPillSvg = (text: string): string => {
-  const w = tokenPillWidth(text)
-  return (
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} 28" width="${w}" height="28" font-family="Segoe UI, system-ui, sans-serif">` +
-    `<rect x="0" y="0" width="${w}" height="28" rx="14" fill="${YELLOW}"/>` +
-    `<text x="${w / 2}" y="19" font-size="14" font-weight="700" fill="${INK}" text-anchor="middle">${esc(text)}</text>` +
-    `</svg>`
-  )
-}
-
-type Pill = {
-  title: string
-  label: string
-  /** 0 to 1, or null while the amount of work is not known. */
-  fraction: number | null
-  isFinished: boolean
-  /** Subagents running right now; the creature shows only when above zero. */
-  agents: number
-}
-
-// The last drawing, kept: the bar redraws often and mostly with nothing new to say.
-let cached = { key: '', svg: '' }
-
-const pillSvg = (p: Pill, width: number): string => {
-  const key = `${width}|${p.title}|${p.label}|${p.fraction}|${p.isFinished}|${p.agents}`
-  if (cached.key === key) return cached.svg
-
-  const fraction = p.fraction ?? 0
-
-  // The right end: percentage, then the subagents when there are any.
-  const agentsW = p.agents > 0 ? ICON_W + 44 : 0
-  const percentRight = width - 24 - agentsW
-  const titleW = Math.max(190, Math.min(380, 190 + (width - 640) * 0.25))
-  const track = {
-    x: 42 + titleW + 12,
-    y: (H - TRACK_H) / 2,
-    w: Math.max(120, percentRight - 52 - (42 + titleW + 12)),
-    h: TRACK_H,
-  }
-  const fillEnd = track.x + track.w * fraction
-
-  // The halftone: dots swell toward the edge of the fill, faint ones lie ahead of it.
-  // A dot is a zero-length stroke with round caps, so every dot of one size shares
-  // one path: a few small paths instead of hundreds of circles.
-  const sizes: string[] = Array.from({ length: DOT_SIZES }, () => '')
-  let faint = ''
-  const cols = Math.floor(track.w / DOT_STEP) - 2
-  for (let c = 0; c < cols; c += 1) {
-    for (let r = 0; r < 3; r += 1) {
-      const x = track.x + DOT_STEP + c * DOT_STEP + (r === 1 ? DOT_STEP / 2 : 0)
-      const y = track.y + 5.5 + r * 5.5
-      if (x < fillEnd) {
-        const size = Math.round(((x - track.x) / Math.max(1, fillEnd - track.x)) * (DOT_SIZES - 1))
-        sizes[size] += `M${x} ${y}h.01`
-      } else {
-        faint += `M${x} ${y}h.01`
-      }
-    }
-  }
-  const dots =
-    sizes
-      .map((d, i) =>
-        d === ''
-          ? ''
-          : `<path d="${d}" fill="none" stroke="${YELLOW}" stroke-width="${(2 * (0.9 + (2 * i) / (DOT_SIZES - 1))).toFixed(1)}" stroke-linecap="round"/>`,
-      )
-      .join('') +
-    (faint === '' ? '' : `<path d="${faint}" fill="none" stroke="#3a3a3a" stroke-width="1.6" stroke-linecap="round"/>`)
-
-  // The label is a yellow sticker riding the edge of the fill, inside the track.
-  const labelW = Math.round(p.label.length * 7.4 + 24)
-  const labelX = Math.max(track.x, Math.min(track.x + track.w - labelW, fillEnd - labelW / 2))
-
-  const percent = p.fraction === null ? '' : `${Math.round(fraction * 100)}%`
-
-  // Subagents: the creature and how many, only while some are running.
-  let agents = ''
-  if (p.agents > 0) {
-    const x0 = width - 24 - agentsW + 8
-    const y0 = (H - ICON_ROWS * ICON_SCALE) / 2
-    agents += `<path transform="translate(${x0} ${y0}) scale(${ICON_SCALE}) translate(0 ${-ICON_TOP})" d="${ICON_PATH}" fill="${ORANGE}" fill-rule="evenodd"/>`
-    agents += `<text x="${x0 + ICON_W + 8}" y="27" font-size="15" font-weight="600" fill="#e6e6e6">×${p.agents}</text>`
-  }
-
-  const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${H}" width="${width}" height="${H}" font-family="Segoe UI, system-ui, sans-serif">` +
-    `<rect x="0.5" y="0.5" width="${width - 1}" height="${H - 1}" rx="${RADIUS}" fill="${DARK}" stroke="#2e2e2e"/>` +
-    `<circle cx="26" cy="22" r="5.5" fill="${p.isFinished ? '#ffffff' : YELLOW}"/>` +
-    `<text x="42" y="27" font-size="15" font-weight="600" fill="#f2f2f2">${esc(clip(p.title, Math.floor(titleW / 7.6)))}</text>` +
-    `<rect x="${track.x}" y="${track.y}" width="${track.w}" height="${track.h}" rx="${track.h / 2}" fill="#1c1c1c" stroke="#2c2c2c"/>` +
-    dots +
-    `<rect x="${labelX.toFixed(1)}" y="9" width="${labelW}" height="26" rx="13" fill="${YELLOW}" stroke="${INK}" stroke-width="2"/>` +
-    `<text x="${(labelX + labelW / 2).toFixed(1)}" y="26.5" font-size="13" font-weight="600" fill="${INK}" text-anchor="middle">${esc(p.label)}</text>` +
-    `<text x="${percentRight}" y="27" font-size="14" fill="#a0a0a0" text-anchor="end">${percent}</text>` +
-    agents +
-    `</svg>`
-
-  cached = { key, svg }
-  return svg
-}
 
 // ---------------------------------------------------------------- the mod
 
@@ -523,7 +390,7 @@ export const register: Register = on => {
     // The terminal draws no pictures: a bar of blocks stands in.
     if (e.surface === 'terminal') {
       const { Box, Text } = $.ui.resolve(e)
-      const subagents = pill.agents > 0 ? ` · ${pill.agents} subagents` : ''
+      const subagents = pill.agents > 0 ? `, ${pill.agents} subagents running` : ''
 
       return (
         <Box>
@@ -604,19 +471,20 @@ export const register: Register = on => {
     if (e.props.placement === 'widget') {
       return (
         <Box>
-          <Text color={ORANGE}>◆ </Text>
-          <Text>{`${running.length} running · ${finished.length} done`}</Text>
+          <Text color={CLAUDE_ORANGE}>◆ </Text>
+          <Text>{`${running.length} running, ${finished.length} done`}</Text>
         </Box>
       )
     }
 
-    const marker = (r: Row) => {
-      if (r.status === 'completed') return { glyph: '✓', color: '#5fd38d' }
-      if (r.status === 'failed') return { glyph: '✗', color: '#e24b4a' }
-      if (r.status === 'killed' || r.status === 'idle') return { glyph: '■', color: '#9aa0a6' }
-      if (r.status === 'pending') return { glyph: '○', color: '#9aa0a6' }
-      return { glyph: '●', color: YELLOW }
-    }
+    const marker = (r: Row) =>
+      ({
+        done: { glyph: '✓', color: C.success },
+        failed: { glyph: '✗', color: C.danger },
+        stopped: { glyph: '■', color: C.muted },
+        waiting: { glyph: '○', color: C.muted },
+        running: { glyph: '●', color: C.accent },
+      })[markOf(r.status)]
 
     const rowView = (r: Row) => {
       const done = r.list.filter(s => s.status === 'completed').length
@@ -624,17 +492,17 @@ export const register: Register = on => {
       const isEnded = r.status === 'completed' || r.status === 'failed' || r.status === 'killed'
       const isPlanned = r.status === 'pending'
       const label = isEnded ? 'Done' : (current?.text ?? (r.hint !== '' ? r.hint : 'Working'))
-      const detail = [r.model, r.effort].filter(x => x !== '').join(' · ')
+      const detail = modelLine(r.model, r.effort)
       const sign = marker(r)
       const ends = isEnded
-        ? `${fmtTokens(r.tokens)} tokens${r.seconds === null ? '' : ` · ${fmtTime(r.seconds)}`}`
+        ? `${fmtTokens(r.tokens)} tokens${r.seconds === null ? '' : `, ${fmtTime(r.seconds)}`}`
         : r.seconds === null
           ? ''
           : fmtTime(r.seconds)
 
       return (
         <Box key={r.id} flexDirection="row" gap={1} paddingY={0}>
-          <Text color={ORANGE}>◆</Text>
+          <Text color={CLAUDE_ORANGE}>◆</Text>
           <Box flexDirection="column" flexGrow={1}>
             <Box flexDirection="row" justifyContent="space-between">
               <Text bold>{r.title}</Text>
@@ -652,7 +520,7 @@ export const register: Register = on => {
                 value={r.list.length > 0 ? done : isEnded ? 1 : undefined}
                 max={r.list.length > 0 ? r.list.length : 1}
                 valueText={r.list.length > 0 ? `${done}/${r.list.length}` : undefined}
-                color={r.status === 'failed' ? '#e24b4a' : KIND_COLOR[r.kind]}
+                color={r.status === 'failed' ? C.danger : KIND_COLOR[r.kind]}
               />
             )}
             {ends === '' ? null : <Text dimColor>{ends}</Text>}
@@ -664,7 +532,7 @@ export const register: Register = on => {
     const cardView = (r: Row) => (
       <Svg
         key={r.id}
-        source={cardSvg(r, paneWidth, now)}
+        source={cardSvg(r, paneWidth)}
         alt={`${r.title}, ${r.type} agent, ${r.status}`}
         width={paneWidth}
         height={CARD_H}
@@ -676,7 +544,7 @@ export const register: Register = on => {
         <Box key={name} flexDirection="column">
           <Button
             key={`head-${name}`}
-            label={`${closed.includes(name) ? '▸' : '▾'} ${title} · ${list.length}`}
+            label={`${closed.includes(name) ? '▸' : '▾'}  ${title} (${list.length})`}
             onPress={() =>
               update($, closedSections, all =>
                 all.includes(name) ? all.filter(n => n !== name) : [...all, name],
@@ -704,7 +572,7 @@ export const register: Register = on => {
                 height={28}
               />
             ) : (
-              <Text backgroundColor={YELLOW} color={INK}>{` ${fmtTokens(spent)} tokens `}</Text>
+              <Text dimColor>{`${fmtTokens(spent)} tokens`}</Text>
             )
           ) : null}
         </Box>
