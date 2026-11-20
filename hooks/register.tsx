@@ -3,6 +3,7 @@ import type { AgentInfo, ElementTable, Register } from 'claude-code'
 
 import type { Activity, AgentExtra, AgentSnap, Step } from '../types'
 import { CARD_H, cardSvg, fmtTime, fmtTokens, markOf, modelLine, statsSvg, STATS_H } from './card'
+import { tookText } from './look'
 import type { Row } from './card'
 import { iconKind, KIND_COLOR } from './icons'
 import { C } from './look'
@@ -213,7 +214,7 @@ export const register: Register = on => {
     }
 
     const now = await $.clock.now()
-    await update($, activity, a => ({ tool: '', calls: 0, pulse: a.pulse, taskStart: now }))
+    await update($, activity, a => ({ tool: '', calls: 0, pulse: a.pulse, taskStart: now, doneMs: null }))
     // A finished list belongs to the last task: start fresh for the next one.
     await update($, steps, list =>
       list.length > 0 && list.every(s => s.status === 'completed') ? [] : list,
@@ -317,6 +318,13 @@ export const register: Register = on => {
 
   on('turn.complete', async ($, e, next) => {
     const id = e.agentId
+    // A reply with no task list: the bar stays, finished, until the next message.
+    if (id === undefined) {
+      const list = await read($, steps)
+      if (list.length === 0) {
+        await update($, activity, a => ({ ...a, doneMs: e.isAborted ? null : e.durationMs }))
+      }
+    }
     if (id !== undefined) {
       const now = await $.clock.now()
       running.delete(id)
@@ -384,6 +392,8 @@ export const register: Register = on => {
         isFinished: false,
         agents,
       }
+    } else if (doing.doneMs != null) {
+      pill = { title: 'Done', label: tookText(doing.doneMs), fraction: 1, isFinished: true, agents }
     }
     if (pill === null) return next(e)
 

@@ -18,6 +18,9 @@ export type Activity = {
   pulse: number
   /** When the last prompt was sent, in milliseconds since the epoch. */
   taskStart: number
+  /** How long the last reply took, in milliseconds, when it ended with no task list; null or
+      missing otherwise. The bar then shows it finished, as a task list's "All done" stays. */
+  doneMs?: number | null
 }
 
 /** What the roster last said about a subagent, kept so a finished one can still be drawn. */

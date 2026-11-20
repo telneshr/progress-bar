@@ -163,3 +163,9 @@ export const statusMark = (
   if (status === 'waiting') return `<circle cx="${cx}" cy="${cy}" r="4.5" fill="none" stroke="${C.muted}" stroke-width="1.8"/>`
   return `<circle cx="${cx}" cy="${cy}" r="5.5" fill="${C.accent}"/>`
 }
+
+/** How long a reply took, for the finished bar: "Took 8 s", "Took 1 min 5 s". */
+export const tookText = (ms: number): string => {
+  const s = Math.max(1, Math.round(ms / 1000))
+  return s < 60 ? `Took ${s} s` : `Took ${Math.floor(s / 60)} min${s % 60 === 0 ? '' : ` ${s % 60} s`}`
+}
