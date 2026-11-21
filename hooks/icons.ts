@@ -49,3 +49,31 @@ export const iconInner = (kind: IconKind): string =>
 export const iconSvg = (kind: IconKind, isDim: boolean): string =>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 20"${isDim ? ' opacity="0.45"' : ''}>` +
   `${iconInner(kind)}</svg>`
+
+// Which job a description's first telling word points to, in order of the roles below.
+const ROLE_WORDS: [RegExp, string, IconKind][] = [
+  [/^(review|audit|verif|inspect|critiqu|proofread|assess)/, 'Review', 'review'],
+  [/^(plan|architect|outline|scope|propose|design)/, 'Plan', 'plan'],
+  [/^(implement|build|fix|refactor|add|updat|chang|creat|port|migrat|code|patch|wire|install|set|make|run|test|debug)/, 'Build', 'build'],
+  [/^(write|writ|draft|doc|readme|rewrit|translat|edit)/, 'Writing', 'design'],
+  [/^(summar|research|find|search|look|investigat|explor|compar|gather|read|fetch|scan|list|collect|check|analy|map|survey|learn|study|locat|trac|inventor|fact)/, 'Research', 'explore'],
+]
+
+/** `statusline-setup` becomes `Statusline setup`. */
+const niceType = (type: string): string => {
+  const t = type.replace(/[-_]+/g, ' ').trim()
+  return t === '' ? 'Helper' : t.charAt(0).toUpperCase() + t.slice(1)
+}
+
+/**
+ * What a subagent is for, in a word. Its type when that says something (Explore, Plan, a
+ * custom agent); for a general-purpose one, a guess from the first telling word of its task.
+ */
+export const roleOf = (type: string, description: string): { word: string; kind: IconKind } => {
+  if (!/^general/i.test(type) && type !== '') return { word: niceType(type), kind: iconKind(type) }
+  for (const word of description.toLowerCase().split(/[^a-z]+/)) {
+    if (word.length < 3) continue
+    for (const [re, name, kind] of ROLE_WORDS) if (re.test(word)) return { word: name, kind }
+  }
+  return { word: 'Helper', kind: 'general' }
+}

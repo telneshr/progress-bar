@@ -92,6 +92,11 @@ export type Halftone = {
   fraction: number | null
   /** Unique within the drawing, for the sweep's clip. */
   id: string
+  /**
+   * The time now, in milliseconds. The drawing is made again every second or so, and
+   * each new copy would start its sweep over; this starts it where the sweep already is.
+   */
+  clock?: number
 }
 
 /**
@@ -131,13 +136,15 @@ export const halftone = (b: Halftone): string => {
   const from = -tail
   const to = Math.round(b.w / DOT_STEP) * DOT_STEP
   const steps = Math.round((to - from) / DOT_STEP)
-  const seconds = Math.max(1.2, (to - from) / 320).toFixed(2)
+  const period = Math.max(1.2, (to - from) / 320)
+  const seconds = period.toFixed(2)
+  const into = (((b.clock ?? 0) / 1000) % period).toFixed(3)
   const rest = Math.round((b.w * 0.35) / DOT_STEP) * DOT_STEP
 
   return (
     `<style>` +
     `@keyframes sweep-${b.id}{from{transform:translateX(${from}px)}to{transform:translateX(${to}px)}}` +
-    `.sweep-${b.id}{transform:translateX(${rest}px);animation:sweep-${b.id} ${seconds}s steps(${steps}) infinite}` +
+    `.sweep-${b.id}{transform:translateX(${rest}px);animation:sweep-${b.id} ${seconds}s steps(${steps}) -${into}s infinite}` +
     `@media (prefers-reduced-motion: reduce){.sweep-${b.id}{animation:none}}` +
     `</style>` +
     `<clipPath id="clip-${b.id}"><rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="${b.h / 2}"/></clipPath>` +

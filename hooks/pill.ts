@@ -47,7 +47,7 @@ export type Pill = {
 // The last drawing, kept: the bar redraws often and mostly with nothing new to say.
 let cached = { key: '', svg: '' }
 
-export const pillSvg = (p: Pill, width: number): string => {
+export const pillSvg = (p: Pill, width: number, clock = 0): string => {
   const key = `${width}|${p.title}|${p.label}|${p.fraction}|${p.isFinished}|${p.agents}`
   if (cached.key === key) return cached.svg
 
@@ -84,7 +84,7 @@ export const pillSvg = (p: Pill, width: number): string => {
     `<rect x="0.5" y="0.5" width="${width - 1}" height="${H - 1}" rx="${RADIUS}" fill="${C.bg}" ${HAIRLINE}/>` +
     statusMark(p.isFinished ? 'done' : 'running', 25, 22) +
     `<text x="44" y="27.5" font-size="15" font-weight="600" fill="${C.text}">${esc(title)}</text>` +
-    halftone({ ...track, fraction: p.fraction, id: 'bar' }) +
+    halftone({ ...track, fraction: p.fraction, id: 'bar', clock }) +
     `<rect x="${labelX.toFixed(1)}" y="9" width="${labelW}" height="26" rx="13" fill="${C.accent}" stroke="${C.ink}" stroke-width="2"/>` +
     `<text x="${(labelX + labelW / 2).toFixed(1)}" y="26.5" font-size="13" font-weight="600" fill="${C.ink}" text-anchor="middle">${esc(label)}</text>` +
     (percent === ''

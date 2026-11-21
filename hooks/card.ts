@@ -49,7 +49,7 @@ export const markOf = (status: AgentInfo['status']): Parameters<typeof statusMar
           : 'running'
 
 /** One subagent's card, `width` pixels wide. */
-export const cardSvg = (r: Row, width: number): string => {
+export const cardSvg = (r: Row, width: number, clock = 0): string => {
   const left = 84
   const right = width - 18
   const isPlanned = r.status === 'pending'
@@ -92,7 +92,7 @@ export const cardSvg = (r: Row, width: number): string => {
       : `<text x="${left + typeW + 10}" y="50" font-size="13" fill="${C.muted}">${esc(fit(model, right - left - typeW - 10, 13))}</text>`) +
     (isPlanned
       ? ''
-      : halftone({ x: left, y: 59, w: barW, h: 14, fraction, id: `c${r.id.replace(/[^a-zA-Z0-9]/g, '')}` }) +
+      : halftone({ x: left, y: 59, w: barW, h: 14, fraction, id: `c${r.id.replace(/[^a-zA-Z0-9]/g, '')}`, clock }) +
         `<text x="${right}" y="70.5" font-size="13" fill="${C.text2}" text-anchor="end" style="font-variant-numeric:tabular-nums">${esc(time)}</text>`) +
     `<text x="${left}" y="91" font-size="13" fill="${r.status === 'failed' ? C.danger : C.muted}">${esc(fit(label, right - left - cornerW, 13))}</text>` +
     `<text x="${right}" y="91" font-size="13" fill="${C.muted}" text-anchor="end">${esc(corner)}</text>` +

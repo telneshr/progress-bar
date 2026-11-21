@@ -5,7 +5,7 @@ import type { Activity, AgentExtra, AgentSnap, Step } from '../types'
 import { CARD_H, cardSvg, fmtTime, fmtTokens, markOf, modelLine, statsSvg, STATS_H } from './card'
 import { tookText } from './look'
 import type { Row } from './card'
-import { iconKind, KIND_COLOR } from './icons'
+import { KIND_COLOR, roleOf } from './icons'
 import { C } from './look'
 import { CLAUDE_ORANGE, H, MAX_WIDTH, MIN_WIDTH, pillSvg, PX_PER_COLUMN, tokenPillSvg, tokenPillWidth } from './pill'
 import type { Pill } from './pill'
@@ -150,21 +150,66 @@ const modelName = (id: string | undefined): string => {
   return m ? `${m[1]!.charAt(0).toUpperCase()}${m[1]!.slice(1)} ${m[2]}.${m[3]}` : clean.replace(/^claude-/, '')
 }
 
+/** The last part of a file path. */
+const baseName = (path: unknown): string => String(path ?? '').split(/[\\/]/).filter(x => x !== '').pop() ?? ''
+
+/** What a tool call is doing, in words, for a subagent's card: "List the files", "Reading card.ts". */
+const toolHint = (name: string, input: Loose): string => {
+  const said = typeof input.description === 'string' ? input.description.trim() : ''
+  switch (name) {
+    case 'Bash':
+    case 'PowerShell':
+      return said !== '' ? said : 'Running a command'
+    case 'Read':
+      return `Reading ${baseName(input.file_path) || 'a file'}`
+    case 'Edit':
+    case 'Write':
+    case 'NotebookEdit':
+      return `Editing ${baseName(input.file_path ?? input.notebook_path) || 'a file'}`
+    case 'Grep':
+      return typeof input.pattern === 'string' ? `Searching for “${input.pattern}”` : 'Searching files'
+    case 'Glob':
+      return typeof input.pattern === 'string' ? `Looking for ${input.pattern}` : 'Looking for files'
+    case 'WebSearch':
+      return typeof input.query === 'string' ? `Searching the web: ${input.query}` : 'Searching the web'
+    case 'WebFetch': {
+      try {
+        return `Reading ${new URL(String(input.url)).hostname.replace(/^www\./, '')}`
+      } catch {
+        return 'Reading a web page'
+      }
+    }
+    case 'Agent':
+    case 'Task':
+      return said !== '' ? `Starting a helper: ${said}` : 'Starting a helper'
+    case 'TodoWrite':
+    case 'TaskCreate':
+    case 'TaskUpdate':
+    case PLAN_TOOL:
+      return 'Updating its task list'
+    default: {
+      const short = name.replace(/^mcp__[^_]+__/, '').replace(/_/g, ' ')
+      return said !== '' ? said : short.charAt(0).toUpperCase() + short.slice(1)
+    }
+  }
+}
+
 const rowOf = (a: AgentSnap, extra: AgentExtra | undefined, now: number): Row => {
   const isLive = a.status === 'running' || a.status === 'waiting'
   const first = a.label.split('\n')[0] ?? ''
   const progress = first !== '' && first !== a.description ? first : ''
+  const role = roleOf(a.type, a.description)
 
   return {
     id: a.id,
-    title: clip(a.description === '' ? a.type : a.description, 34),
-    type: a.type,
-    kind: iconKind(a.type),
+    title: clip(a.description === '' ? role.word : a.description, 34),
+    type: role.word,
+    kind: role.kind,
     model: modelName(a.model),
     effort: a.effort === undefined ? '' : cap(String(a.effort)),
     status: a.status,
     list: extra?.steps ?? [],
-    hint: clip(progress !== '' ? progress : (extra?.lastTool ?? '').replace(/^mcp__[^_]+__/, ''), 40),
+    hint: clip(progress !== '' ? progress : (extra?.lastTool ?? ''), 60),
     tokens: a.tokenCount,
     seconds: isLive
       ? (now - a.startTime) / 1000
@@ -243,7 +288,7 @@ export const register: Register = on => {
     if (agentId === undefined) {
       await update($, activity, a => ({ ...a, tool: name, calls: a.calls + 1 }))
     } else {
-      await update($, agentExtras, all => touch(all, agentId, one => ({ ...one, lastTool: name })))
+      await update($, agentExtras, all => touch(all, agentId, one => ({ ...one, lastTool: toolHint(name, input) })))
     }
 
     // TaskCreate says the new task's id only once it has run.
@@ -419,7 +464,7 @@ export const register: Register = on => {
     return (
       <Box>
         <Svg
-          source={pillSvg(pill, width)}
+          source={pillSvg(pill, width, await $.clock.now())}
           alt={`${pill.title}: ${pill.label}${pill.agents > 0 ? `, ${pill.agents} subagents running` : ''}`}
           width={width}
           height={H}
@@ -542,7 +587,7 @@ export const register: Register = on => {
     const cardView = (r: Row) => (
       <Svg
         key={r.id}
-        source={cardSvg(r, paneWidth)}
+        source={cardSvg(r, paneWidth, now)}
         alt={`${r.title}, ${r.type} agent, ${r.status}`}
         width={paneWidth}
         height={CARD_H}
@@ -551,7 +596,7 @@ export const register: Register = on => {
 
     const section = (name: string, title: string, list: Row[]) =>
       list.length === 0 ? null : (
-        <Box key={name} flexDirection="column">
+        <Box key={name} flexDirection="column" gap={1}>
           <Button
             key={`head-${name}`}
             label={`${closed.includes(name) ? '▸' : '▾'}  ${title} (${list.length})`}

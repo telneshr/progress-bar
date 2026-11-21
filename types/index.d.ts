@@ -42,7 +42,7 @@ export type AgentExtra = {
   snap?: AgentSnap | undefined
   /** The subagent's own task list, when it keeps one. */
   steps: Step[]
-  /** The last tool it called. */
+  /** What its last tool call was doing, in words ("Reading card.ts"). */
   lastTool: string
   /** When its turn ended, in milliseconds since the epoch; null while it runs. */
   endedAt: number | null
